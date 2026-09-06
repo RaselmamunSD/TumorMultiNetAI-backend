@@ -130,8 +130,6 @@ class GeminiVisionService:
                         "Content-Type": "application/json",
                         "x-goog-api-key": api_key,
                     }
-                    if api_key.startswith("AQ."):
-                        headers["Authorization"] = f"Bearer {api_key}"
 
                     response = await client.post(url, json=payload, headers=headers)
                     if response.status_code == 200:

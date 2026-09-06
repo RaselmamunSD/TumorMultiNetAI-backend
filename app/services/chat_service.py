@@ -46,8 +46,6 @@ class ChatService:
                     "Content-Type": "application/json",
                     "x-goog-api-key": api_key,
                 }
-                if api_key.startswith("AQ."):
-                    headers["Authorization"] = f"Bearer {api_key}"
                 
                 payload = {
                     "contents": contents,
