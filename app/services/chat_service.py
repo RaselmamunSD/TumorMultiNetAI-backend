@@ -41,7 +41,13 @@ class ChatService:
 
                 contents.append({"role": "user", "parts": [{"text": user_message}]})
 
-                url = f"https://generativelanguage.googleapis.com/v1beta/models/{settings.GEMINI_MODEL}:generateContent?key={api_key}"
+                url = f"https://generativelanguage.googleapis.com/v1beta/models/{settings.GEMINI_MODEL}:generateContent"
+                headers = {
+                    "Content-Type": "application/json",
+                    "x-goog-api-key": api_key,
+                }
+                if api_key.startswith("AQ."):
+                    headers["Authorization"] = f"Bearer {api_key}"
                 
                 payload = {
                     "contents": contents,
@@ -55,7 +61,7 @@ class ChatService:
                 }
 
                 async with httpx.AsyncClient(timeout=15.0) as client:
-                    response = await client.post(url, json=payload)
+                    response = await client.post(url, json=payload, headers=headers)
                     if response.status_code == 200:
                         data = response.json()
                         candidates = data.get("candidates", [])

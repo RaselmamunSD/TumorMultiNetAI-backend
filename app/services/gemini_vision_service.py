@@ -125,8 +125,11 @@ class GeminiVisionService:
         async with httpx.AsyncClient(timeout=30.0) as client:
             for model_name in unique_models:
                 try:
-                    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={api_key}"
-                    headers = {"Content-Type": "application/json"}
+                    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent"
+                    headers = {
+                        "Content-Type": "application/json",
+                        "x-goog-api-key": api_key,
+                    }
                     if api_key.startswith("AQ."):
                         headers["Authorization"] = f"Bearer {api_key}"
 
