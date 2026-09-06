@@ -34,6 +34,10 @@ class PredictionResponse(BaseModel):
     model_name: Optional[str] = None
     model_version: Optional[str] = None
     processing_time_ms: Optional[float] = None
+    gradcam_url: Optional[str] = None
+    overlay_url: Optional[str] = None
+    box_2d: Optional[List[int]] = None
+    anatomical_location: Optional[str] = None
     disclaimer: str
 
     class Config:

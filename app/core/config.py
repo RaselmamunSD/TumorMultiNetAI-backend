@@ -87,7 +87,7 @@ class Settings(BaseSettings):
 
     # Gemini AI Configuration
     GEMINI_API_KEY: str = ""
-    GEMINI_MODEL: str = "gemini-1.5-flash"
+    GEMINI_MODEL: str = "gemini-3.1-flash-lite"
 
     # Medical Disclaimer Standard text
     MEDICAL_DISCLAIMER: str = (

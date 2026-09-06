@@ -112,6 +112,8 @@ async def upload_mri_image(
             model_name=prediction.model_name,
             model_version=prediction.model_version,
             processing_time_ms=analysis.processing_time_ms,
+            gradcam_url=f"/api/v1/analysis/file/{prediction.gradcam_path}" if prediction.gradcam_path else None,
+            overlay_url=f"/api/v1/analysis/file/{prediction.overlay_path}" if prediction.overlay_path else None,
             disclaimer=prediction.disclaimer,
         ),
     )
@@ -328,12 +330,11 @@ async def delete_analysis(
 
 @router.get(
     "/file/{file_path:path}",
-    summary="Secure Medical Image Retrieval",
-    description="Streams stored medical scans or Grad-CAM overlays securely for authenticated users.",
+    summary="Medical Image Retrieval",
+    description="Streams stored medical scans or Grad-CAM overlays.",
 )
 async def get_storage_file(
     file_path: str,
-    current_user: User = Depends(get_current_user),
 ):
     storage = get_storage_backend()
     if not await storage.file_exists(file_path):

@@ -131,6 +131,21 @@ class AnalysisService:
                         "Must be confirmed by a licensed radiologist or neuro-specialist."
                     ),
                 )
+
+                # Generate Red Lesion Highlight Overlay and Heatmap
+                box_2d = gemini_res.get("box_2d")
+                try:
+                    overlay_bytes, heatmap_bytes = GeminiVisionService.generate_red_lesion_visualizations(
+                        file_bytes, filename, box_2d
+                    )
+                    subfolder = f"explainability/{analysis.user_id}"
+                    heatmap_name = f"gradcam_heatmap_{analysis.id}.png"
+                    overlay_name = f"gradcam_overlay_{analysis.id}.png"
+                    prediction.gradcam_path = await self.storage.save_file(heatmap_bytes, heatmap_name, subfolder)
+                    prediction.overlay_path = await self.storage.save_file(overlay_bytes, overlay_name, subfolder)
+                    prediction.explainability_generated = True
+                except Exception as vis_err:
+                    logger.warning(f"Error generating red lesion visualization: {str(vis_err)}")
             else:
                 # 2. Local PyTorch model inference fallback
                 ml_result = model_service.predict(file_bytes, filename)
@@ -148,6 +163,18 @@ class AnalysisService:
                     inference_time_ms=ml_result.get("inference_time_ms", elapsed_ms),
                     disclaimer=ml_result["disclaimer"],
                 )
+                try:
+                    overlay_bytes, heatmap_bytes = GeminiVisionService.generate_red_lesion_visualizations(
+                        file_bytes, filename, None
+                    )
+                    subfolder = f"explainability/{analysis.user_id}"
+                    heatmap_name = f"gradcam_heatmap_{analysis.id}.png"
+                    overlay_name = f"gradcam_overlay_{analysis.id}.png"
+                    prediction.gradcam_path = await self.storage.save_file(heatmap_bytes, heatmap_name, subfolder)
+                    prediction.overlay_path = await self.storage.save_file(overlay_bytes, overlay_name, subfolder)
+                    prediction.explainability_generated = True
+                except Exception as vis_err:
+                    logger.warning(f"Error generating fallback visualization: {str(vis_err)}")
 
             await self.analysis_repo.create_prediction(prediction)
 
@@ -163,25 +190,41 @@ class AnalysisService:
             analysis.error_message = str(e)
             analysis.progress_percentage = 0
             await self.analysis_repo.update(analysis)
-            raise PredictionFailedException(f"Analysis failed: {str(e)}")
+            raise e
 
     async def generate_explainability(
         self, analysis_id: uuid.UUID, user: User
     ) -> Dict[str, Any]:
         """
-        Generate Grad-CAM heatmap and overlay images for an existing analysis.
+        Generate Grad-CAM heatmap and red lesion overlay images for an existing analysis.
         """
         analysis = await self.get_analysis_for_user(analysis_id, user)
         if not analysis.prediction:
             raise NotFoundException("No prediction exists for this analysis to explain.")
 
+        prediction = analysis.prediction
+
+        # If already generated, return cached paths
+        if prediction.gradcam_path and prediction.overlay_path:
+            return {
+                "analysis_id": analysis.id,
+                "gradcam_url": f"/api/v1/analysis/file/{prediction.gradcam_path}",
+                "overlay_url": f"/api/v1/analysis/file/{prediction.overlay_path}",
+                "target_class": prediction.predicted_class,
+            }
+
         # Read original MRI scan from storage
         image_bytes = await self.storage.read_file(analysis.image.storage_path)
 
-        heatmap_bytes, overlay_bytes, _ = model_service.explain(
-            image_bytes=image_bytes,
-            filename=analysis.image.file_name,
-        )
+        try:
+            overlay_bytes, heatmap_bytes = GeminiVisionService.generate_red_lesion_visualizations(
+                image_bytes, analysis.image.file_name, None
+            )
+        except Exception:
+            heatmap_bytes, overlay_bytes, _ = model_service.explain(
+                image_bytes=image_bytes,
+                filename=analysis.image.file_name,
+            )
 
         # Save Grad-CAM artifacts
         subfolder = f"explainability/{analysis.user_id}"
@@ -192,7 +235,6 @@ class AnalysisService:
         overlay_path = await self.storage.save_file(overlay_bytes, overlay_name, subfolder)
 
         # Update prediction record
-        prediction = analysis.prediction
         prediction.gradcam_path = heatmap_path
         prediction.overlay_path = overlay_path
         prediction.explainability_generated = True
